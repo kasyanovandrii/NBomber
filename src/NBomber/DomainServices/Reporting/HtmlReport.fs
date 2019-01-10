@@ -55,11 +55,11 @@ module StatisticsTable =
                         step.Percent50.ToString(); step.Percent75.ToString(); step.Percent95.ToString();
                         step.StdDev.ToString()]
             
-            let dataTransferBlock = if step.DataTransfer.AllMB > 0.0 then
-                                       [step.DataTransfer.MinKb.ToString()
-                                        step.DataTransfer.MeanKb.ToString()
-                                        step.DataTransfer.MaxKb.ToString()
-                                        step.DataTransfer.MaxKb.ToString()]
+            let dataTransferBlock = if step.DataTransferCount.AllMB > 0.0<MB> then
+                                       [step.DataTransferCount.MinKb.ToString()
+                                        step.DataTransferCount.MeanKb.ToString()
+                                        step.DataTransferCount.MaxKb.ToString()
+                                        step.DataTransferCount.MaxKb.ToString()]
                                     else 
                                         ["-"; "-"; "-"; "-"]
 

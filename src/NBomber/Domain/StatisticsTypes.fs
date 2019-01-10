@@ -4,11 +4,15 @@ open System
 open NBomber.Contracts
 open NBomber.Domain.DomainTypes
 
+[<Measure>] type Bytes
+[<Measure>] type Kb
+[<Measure>] type MB
+
 type DataTransferCount = {
-    MinKb: float
-    MeanKb: float
-    MaxKb: float
-    AllMB: float
+    MinKb: float<Kb>
+    MeanKb: float<Kb>
+    MaxKb: float<Kb>
+    AllMB: float<MB>
 }
 
 type LatencyCount = {
@@ -20,7 +24,7 @@ type LatencyCount = {
 type StepResults = {     
     StepName: string
     Results: (Response*Latency)[]    
-    DataTransfer: DataTransferCount
+    DataTransferCount: DataTransferCount
 }
 
 type StepStats = {
@@ -37,7 +41,7 @@ type StepStats = {
     Percent75: Latency
     Percent95: Latency
     StdDev: int
-    DataTransfer: DataTransferCount
+    DataTransferCount: DataTransferCount
 }
 
 type ScenarioStats = {

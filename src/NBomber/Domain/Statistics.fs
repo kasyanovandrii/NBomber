@@ -19,16 +19,16 @@ let calcRPS (latencies: Latency[], scnDuration: TimeSpan) =
                    else scnDuration.TotalSeconds
     latencies.Length / int(totalSec)
 
-let calcMin (latencies: Latency[]) =
-    if Array.isEmpty latencies then 0 else Array.min(latencies)
+let calcMin (values: int[]) =
+    if Array.isEmpty values then 0 else Array.min(values)
 
-let calcMean (latencies: Latency[]) =        
-    if Array.isEmpty latencies 
+let calcMean (values: int[]) =        
+    if Array.isEmpty values 
     then 0
-    else latencies |> Array.map(float) |> Array.average |> int
+    else values |> Array.map(float) |> Array.average |> int
 
-let calcMax (latencies: Latency[]) =
-    if Array.isEmpty latencies then 0 else Array.max(latencies)
+let calcMax (values: int[]) =
+    if Array.isEmpty values then 0 else Array.max(values)
 
 let calcPercentile (histogram: LongHistogram, percentile: float) =
     if histogram.TotalCount > 0L then int(histogram.GetValueAtPercentile(percentile)) else 0
@@ -39,18 +39,25 @@ let calcStdDev (histogram: LongHistogram) =
     else
         0
 
-let fromBytesToKb (sizeBytes: int) =
-    if sizeBytes > 0 then float(sizeBytes) / 1024.0
-    else 0.0
+let intToBytes (value: int) = value * 1<Bytes>
+let floatToKb (value: float) = value * 1.0<Kb>
+let floatToMB (value: float) = value * 1.0<MB>
+let measureToFloat (value: float<_>) = float value
+let measureToInt (value: int<_>) = int value
 
-let fromKbToMb (sizeKb: float) =
-    if sizeKb > 0.0 then sizeKb / 1024.0
-    else 0.0
+let fromBytesToKb (size: int<Bytes>) =
+    if size > 0<Bytes> then (float size / 1024.0) |> floatToKb
+    else 0.0<Kb>
 
-let calcAllMB (sizesBytes: int[]) =    
-    let toMB (sizeBytes) = sizeBytes |> fromBytesToKb |> fromKbToMb   
-    sizesBytes     
-    |> Array.fold(fun sizeMb sizeKb -> sizeMb + toMB(sizeKb)) 0.0
+let fromKbToMb (size: float<Kb>) =
+    if size > 0.0<Kb> then (size / 1024.0<Kb>) |> floatToMB
+    else 0.0<MB>
+
+let fromBytesToMB = fromBytesToKb >> fromKbToMb   
+
+let calcAllMB (sizes: int<Bytes>[]) =
+    sizes
+    |> Array.fold(fun sizeMb sizeB -> sizeMb + fromBytesToMB(sizeB)) 0.0<MB>
 
 module StepResults =
 
@@ -58,11 +65,15 @@ module StepResults =
         let allSizesBytes = responses
                             |> Array.map(fst)
                             |> Array.filter(fun x -> x.SizeBytes > 0)
-                            |> Array.map(fun x -> x.SizeBytes)
+                            |> Array.map(fun x -> x.SizeBytes |> intToBytes)
+        
+        let min  = Array.map(measureToInt) >> calcMin  >> intToBytes >> fromBytesToKb
+        let mean = Array.map(measureToInt) >> calcMean >> intToBytes >> fromBytesToKb
+        let max  = Array.map(measureToInt) >> calcMax  >> intToBytes >> fromBytesToKb
 
-        { MinKb  = allSizesBytes |> calcMin |> fromBytesToKb
-          MeanKb = allSizesBytes |> calcMean |> fromBytesToKb
-          MaxKb  = allSizesBytes |> calcMax |> fromBytesToKb
+        { MinKb  = min(allSizesBytes)
+          MeanKb = mean(allSizesBytes)
+          MaxKb  = max(allSizesBytes)
           AllMB  = calcAllMB(allSizesBytes) }
 
     let mergeTraffic (counts: DataTransferCount[]) =
@@ -72,24 +83,27 @@ module StepResults =
             if result > 0.01 then result            
             else Math.Round(value, 4)
 
-        { MinKb  = counts |> Array.map(fun x -> x.MinKb) |> Array.min |> roundResult
-          MeanKb = counts |> Array.map(fun x -> x.MeanKb) |> Array.average |> roundResult
-          MaxKb  = counts |> Array.map(fun x -> x.MaxKb) |> Array.max |> roundResult
-          AllMB  = counts |> Array.sumBy(fun x -> x.AllMB) |> roundResult }  
+        let roundKb = measureToFloat >> roundResult >> floatToKb
+        let roundMB = measureToFloat >> roundResult >> floatToMB
+
+        { MinKb  = counts |> Array.map(fun x -> x.MinKb) |> Array.min |> roundKb
+          MeanKb = counts |> Array.map(fun x -> x.MeanKb) |> Array.average |> roundKb
+          MaxKb  = counts |> Array.map(fun x -> x.MaxKb) |> Array.max |> roundKb
+          AllMB  = counts |> Array.sumBy(fun x -> x.AllMB) |> roundMB }  
           
     let merge (stepsResults: StepResults[]) =
         stepsResults
         |> Array.groupBy(fun x -> x.StepName)
         |> Array.map(fun (stName, results) ->            
-            let dataTransfer = results |> Array.map(fun x -> x.DataTransfer) |> mergeTraffic
+            let dataTransfer = results |> Array.map(fun x -> x.DataTransferCount) |> mergeTraffic
             { StepName = stName
               Results = results |> Array.collect(fun x -> x.Results)
-              DataTransfer = dataTransfer })
+              DataTransferCount = dataTransfer })
 
     let create (stepName, results: (Response*Latency)[]) =
         { StepName = stepName 
           Results = results
-          DataTransfer = calcDataTransfer(results) }
+          DataTransferCount = calcDataTransfer(results) }
 
 module StepStats = 
 
@@ -110,7 +124,7 @@ module StepStats =
           Percent75 = calcPercentile(histogram, 75.0)
           Percent95 = calcPercentile(histogram, 95.0)
           StdDev = calcStdDev(histogram)
-          DataTransfer = stepResults.DataTransfer }    
+          DataTransferCount = stepResults.DataTransferCount }    
 
 module ScenarioStats =        
 

@@ -18,10 +18,10 @@ type AssertStats with
           Percent75 = stats.Percent75
           Percent95 = stats.Percent95
           StdDev = stats.StdDev
-          DataMinKb = stats.DataTransfer.MinKb
-          DataMeanKb = stats.DataTransfer.MeanKb
-          DataMaxKb = stats.DataTransfer.MaxKb
-          AllDataMB = stats.DataTransfer.AllMB }
+          DataMinKb = float stats.DataTransferCount.MinKb
+          DataMeanKb = float stats.DataTransferCount.MeanKb
+          DataMaxKb = float stats.DataTransferCount.MaxKb
+          AllDataMB = float stats.DataTransferCount.AllMB }
 
 let create (assertions: IAssertion[]) = 
     assertions |> Array.map(fun x -> x :?> Assertion)
